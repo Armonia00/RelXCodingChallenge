@@ -1,0 +1,84 @@
+import csv
+import requests
+from bs4 import BeautifulSoup
+
+def scrape_license_verification(board, license_type, last_name_start):
+    url = "https://idbop.mylicense.com/verification/Search.aspx"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36"
+    }
+
+    # Data for searching
+    data = {
+        "Board": board,
+        "LicenseType": license_type,
+        "LastName": last_name_start,
+        "FirstName": ""
+    }
+
+    # Sending a POST request with necessary data
+    response = requests.post(url, headers=headers, data=data)
+
+    # Check if request was successful
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.content, 'html.parser')
+        license_list = []
+
+        # Extracting license information from the search results
+        license_rows = soup.find_all('tr', class_='datagridRow')  # Assuming license data is in table rows with this class
+        for row in license_rows:
+            columns = row.find_all('td')
+            first_name = columns[0].text.strip()
+            middle_name = columns[1].text.strip()
+            last_name = columns[2].text.strip()
+            license_number = columns[3].text.strip()
+            license_type = columns[4].text.strip()
+            status = columns[5].text.strip()
+            original_issued_date = columns[6].text.strip()
+            expiry = columns[7].text.strip()
+            renewed = columns[8].text.strip()
+
+            # Storing license data in a dictionary
+            license_data = {
+                "First Name": first_name,
+                "Middle Name": middle_name,
+                "Last Name": last_name,
+                "License Number": license_number,
+                "License Type": license_type,
+                "Status": status,
+                "Original Issued Date": original_issued_date,
+                "Expiry": expiry,
+                "Renewed": renewed
+            }
+            license_list.append(license_data)
+
+        return license_list
+    else:
+        print("Failed to retrieve data. Status code:", response.status_code)
+        return None
+
+def save_to_csv(data, filename):
+    if data:
+        keys = data[0].keys()
+        with open(filename, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=keys)
+            writer.writeheader()
+            writer.writerows(data)
+        print("Data saved to", filename)
+    else:
+        print("No data to save.")
+
+# Example usage:
+board = "48"  # You may need to adjust this value
+license_type = "1"  # You can change the license type as needed
+last_name_start = "L"  # You can change the starting letter of the last name as needed
+
+# Scraping license data
+license_data = scrape_license_verification(board, license_type, last_name_start)
+
+# Saving data to CSV file
+if license_data:
+    filename = f"idaho_{license_type}_licenses_starting_with_{last_name_start}.csv"
+    save_to_csv(license_data, filename)
+else:
+    print("No data found for the specified criteria.")
